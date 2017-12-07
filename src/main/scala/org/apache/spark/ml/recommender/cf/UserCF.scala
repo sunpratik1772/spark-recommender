@@ -182,7 +182,7 @@ class UserCF(override val uid: String) extends Estimator[UserCFModel] with UserC
   /** @group expertSetParam */
   def setFinalStorageLevel(value: String): this.type = set(finalStorageLevel, value)
 
-  /** @group expertSetParam*/
+  /** @group expertSetParam */
   def setColdStartStrategy(value: String): this.type = set(coldStartStrategy, value)
 
   override def fit(dataset: Dataset[_]): UserCFModel = {
@@ -195,14 +195,16 @@ class UserCF(override val uid: String) extends Estimator[UserCFModel] with UserC
       .select(checkedCast(col($(userCol))), checkedCast(col($(itemCol))), rating)
       .rdd
 
-    val handlePersistence = rawCols.getStorageLevel == StorageLevel.NONE
-    if (handlePersistence) rawCols.persist(StorageLevel.fromString($(intermediateStorageLevel)))
-    // materialize raw columns
-    rawCols.count()
+    require(!rawCols.isEmpty(), s"No ratings available from $rawCols")
 
     val instr = Instrumentation.create(this, rawCols)
     instr.logParams(userCol, itemCol, ratingCol, numSimilarUsers, topKItems, similarityMeasure,
       interactionCut, intermediateStorageLevel, finalStorageLevel)
+
+    val handlePersistence = rawCols.getStorageLevel == StorageLevel.NONE
+    if (handlePersistence) rawCols.persist(StorageLevel.fromString($(intermediateStorageLevel)))
+    // materialize raw columns
+    rawCols.count()
 
     val norm = computeNorm(rawCols, $(similarityMeasure))
     val bcNorm = spark.sparkContext.broadcast(norm.collect())
@@ -211,9 +213,7 @@ class UserCF(override val uid: String) extends Estimator[UserCFModel] with UserC
       .groupByKey()
       .filter(_._2.size > 1)
 
-    require(!itemUserRating.isEmpty(), s"No ratings available from $itemUserRating")
-
-    val userPairs = computeUserPairs(itemUserRating)
+    val userPairs = computeUserPairs(itemUserRating, $(interactionCut))
     val similarity = computeUser2UserSimilarity(userPairs, $(similarityMeasure), bcNorm)
 
     val userItemRating = rawCols.map(row => (row.getInt(0), (row.getInt(1), row.getFloat(2))))
@@ -283,21 +283,21 @@ class UserCF(override val uid: String) extends Estimator[UserCFModel] with UserC
   }
 
   private def computeUserPairs(
-      itemUserRating: RDD[(Int, Iterable[(Int, Float)])]): RDD[((Int, Int), Iterable[(Float, Float)])] = {
+      itemUserRating: RDD[(Int, Iterable[(Int, Float)])],
+      interactionCut: Int): RDD[((Int, Int), Iterable[(Float, Float)])] = {
     /**
      * A moderately sized interactionCut is sufficient to achieve prediction quality close to
      * that of un-sampled data while it can handle scaling issues introduced by the heavy tailed
      * distribution of user interactions commonly encountered in recommendation mining scenarios.
      */
-    val sampledItemUserRating = if ($(interactionCut) == 0) {
+    val sampledItemUserRating = if (interactionCut == 0) {
       itemUserRating
     } else {
-      itemUserRating.map { case(item: Int, userRating: Iterable[(Int, Float)]) =>
-        val userRatingArray = userRating.toArray
-        if (userRatingArray.length > $(interactionCut)) {
-          val sampledUserRating = Array.fill($(interactionCut))(
-            userRatingArray(Random.nextInt(userRatingArray.length)))
-          (item, sampledUserRating)
+      itemUserRating.map { case (item: Int, userRating: Iterable[(Int, Float)]) =>
+        val userRatingSeq = userRating.toSeq
+        if (userRatingSeq.length > interactionCut) {
+          val sampledUserRatingSeq = Random.shuffle(userRatingSeq).take(interactionCut)
+          (item, sampledUserRatingSeq)
         } else {
           (item, userRating)
         }
@@ -322,7 +322,7 @@ class UserCF(override val uid: String) extends Estimator[UserCFModel] with UserC
         similarityMeasure match {
           case CFModel.cosineSimilarity =>
             val numerator = ratingPair.foldLeft(0.toFloat) { case (s: Float, r: (Float, Float)) =>
-              s + r._1 * r._2}
+              s + r._1 * r._2 }
             val u1Norm = localNorm(userPair._1)._1
             val u2Norm = localNorm(userPair._2)._1
             val denominator = math.sqrt(u1Norm) * math.sqrt(u2Norm).toFloat
@@ -401,9 +401,9 @@ class UserCFModel private[ml](
     recsDF: DataFrame,
     userColOfRecsDF: String,
     itemColOfRecsDF: String)
-  extends Model[UserCFModel] with CFModelParams {
+    extends Model[UserCFModel] with CFModelParams {
 
-  /** @group setParam*/
+  /** @group setParam */
   def setUserCol(value: String): this.type = set(userCol, value)
 
   /** @group setParam */

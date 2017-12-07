@@ -33,8 +33,8 @@ private[recommender] trait CFModelParams extends Params with HasPredictionCol {
    * Default: "user"
    * @group param
    */
-  val userCol = new Param[String](this, "userCol", "column name for user ids. Ids must be within " +
-    "the integer value range.")
+  val userCol = new Param[String](this, "userCol", "column name for user ids. Ids must be " +
+    "within the integer value range.")
 
   /** @group getParam */
   def getUserCol: String = $(userCol)
@@ -46,8 +46,8 @@ private[recommender] trait CFModelParams extends Params with HasPredictionCol {
    * Default: "item"
    * @group param
    */
-  val itemCol = new Param[String](this, "itemCol", "column name for item ids. Ids must be within " +
-    "the integer value range.")
+  val itemCol = new Param[String](this, "itemCol", "column name for item ids. Ids must be " +
+    "within the integer value range.")
 
   /** @group getParam */
   def getItemCol: String = $(itemCol)
@@ -87,13 +87,13 @@ private[recommender] trait CFModelParams extends Params with HasPredictionCol {
         if (v.doubleValue == intV) {
           intV
         } else {
-          throw new IllegalArgumentException(s"UserCF only supports values in Integer range " +
-            s"and without fractional part for columns ${$(userCol)} and ${$(itemCol)}. " +
+          throw new IllegalArgumentException(s"UserCF/ItemCF only supports values in Integer " +
+            s"range and without fractional part for columns ${$(userCol)} and ${$(itemCol)}. " +
             s"Value $n was either out of Integer range or contained a fractional part that " +
             s"could not be converted.")
         }
-      case _ => throw new IllegalArgumentException(s"UserCF only supports values in Integer range " +
-        s"for columns ${$(userCol)} and ${$(itemCol)}. Value $n was not numeric.")
+      case _ => throw new IllegalArgumentException(s"UserCF/ItemCF only supports values in " +
+        s"Integer range for columns ${$(userCol)} and ${$(itemCol)}. Value $n was not numeric.")
     }
   }
 }
