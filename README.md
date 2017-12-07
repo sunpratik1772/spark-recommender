@@ -1,6 +1,7 @@
 # Spark-Recommender
 Spark-Recommender is a library of parallel algorithms for recommender systems based on Spark. Now it includes following algorithms:
 + UserCF: one of most famous memory-based(or neighborhood-based) collaborative filter algorithms. The implementation of this algorithm is inspired from [Scalable Similarity-Based Neighborhood Methods with MapReduce](https://dl.acm.org/citation.cfm?id=2365984). Invert indexing and down-sampling tricks have been used to optimize its efficiency and scalability.
++ ItemCF: one of most famous memory-based(or neighborhood-based) collaborative filter algorithms. The implementation of this algorithm is inspired from [Scalable Similarity-Based Neighborhood Methods with MapReduce](https://dl.acm.org/citation.cfm?id=2365984). Invert indexing and down-sampling tricks have been used to optimize its efficiency and scalability.
 
 # Examples
 ## Scala API
